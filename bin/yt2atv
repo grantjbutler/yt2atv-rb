@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+
+require 'airplay'
+#require 'highline/import'
+
+Thread.abort_on_exception = true
+trap 'INT' do exit! end
+trap 'TERM' do exit! end
+
+if ARGV.length < 1
+	puts 'yt2atv version 0.1'
+	puts '  usage: yt2atv <URL>'
+	
+	exit
+end
+
+YOUTUBE_DL_BIN = File.join(File.dirname(__FILE__), 'youtube-dl')
+
+youtubeURL = ARGV[0]
+
+puts 'Select an AirPlay device'
+
+deviceNames = []
+
+i = 0
+Airplay.devices.each do |device|
+	puts "#{i} - #{device.name}"
+	deviceNames << device.name
+	
+	i += 1
+end
+
+selectedDeviceIndex = $stdin.gets.to_i
+selectedDeviceIndex = [0, selectedDeviceIndex].max
+selectedDeviceIndex = [selectedDeviceIndex, deviceNames.length - 1].min
+
+selectedDeviceName = deviceNames[selectedDeviceIndex]
+selectedDevice = Airplay[selectedDeviceName]
+
+youtubeVideoURL = `#{YOUTUBE_DL_BIN} --get-url #{youtubeURL}`
+
+player = selectedDevice.play(youtubeVideoURL)
+
+# I'm not sure if the following two events actually do anything or not...
+player.on(:played) do
+	exit!
+end
+
+player.on(:stopped) do
+	exit!
+end
+
+player.progress -> progress {
+	if progress.stopped? or progress.played?
+		exit!
+	end
+}
+
+puts 'Playing YouTube video. Press CTL+C to stop.'
+
+player.wait
+
+# This code causes the terminal to break. No more text can be seen. Find an alternative way of doing this.
+#while true do
+#	answer = ask("") do |q|
+#		q.echo = false
+#		q.character = true
+#		q.overwrite = true
+#	end
+#	
+#	if answer == ' '
+#		if player.playing?
+#			player.pause
+#		elsif player.paused?
+#			player.resume
+#		end
+#	end
+#end
